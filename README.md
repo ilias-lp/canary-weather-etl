@@ -2,7 +2,7 @@
 
 In this personal data engineering project, the aim is to set up a cloud based database comprising an extensive set of historical weather parameters for several recent years across multiple locations in Canary Islands. The use case of such database is finding out best spots and periods for various sorts of activities (hiking, surfing, beach, etc.) that depend on weather conditions. Next to setting up a bulk of historical data, monthly periodic updates are a part of the scope for keeping the database content relevant and up-to-date.
 
-**Project Outline:**
+**Project Outline**
 
 Amazon Web Services (AWS) platform will be used as cloud provider for the whole Extract, Transform and Load (ETL) sequence.
 
