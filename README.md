@@ -765,7 +765,8 @@ After the Glue job is completed, Parquet files are stored in a designated S3 buc
 
 ![s3_3](https://github.com/user-attachments/assets/dd96850e-cfe8-4865-a7ca-184e0670bbf5)
 
-In order to create a catalogue table, a Glue crawler was created for a given S3 location that has automatically detected schema and partitions.
+In order to create a new catalogue table, a Glue crawler was created for the given S3 location that has automatically detected schema and partitions.
 
 ![crawler](https://github.com/user-attachments/assets/4fe42593-43fd-4116-96dc-2737597a119e)
 
+![schema](https://github.com/user-attachments/assets/e6d707dd-50dd-452e-a220-454217f84f20)
