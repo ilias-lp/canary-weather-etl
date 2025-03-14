@@ -534,7 +534,41 @@ This concludes the historical raw data collection that is now stored in S3 and o
 
 ![s3_1](https://github.com/user-attachments/assets/abc6b59d-6ced-430a-8e73-ce7bec1a2b32)
 
-Each location folder contains 2 JSON files corresponding to 2 data sources of origin. In order to differentiate, files from Visual Crossing have 'vc' prefix in their names.
+Each location folder contains 2 JSON files corresponding to 2 data sources of origin. In order to differentiate, files from Visual Crossing got assigned 'vc' prefix in their names.
 
 ![s3_2](https://github.com/user-attachments/assets/55c20375-c824-4e3c-894d-9a7ca2d1ab4f)
+
+## Data transformation
+
+Before merging JSON files together it's important to point out that despite same file format, they have different internal structure.
+
+Files from Open-meteo API have array structure that goes as follows:
+
+{"location": "Tenerife/Vilaflor", "latitude": 28.1562, "longitude": -16.6359, "elevation": 1387.0, "timezone": "Atlantic/Canary", "daily": {"date": ["2021-01-01", "2021-01-02", "2021-01-03", "2021-01-04", "2021-01-05", "2021-01-06", "2021-01-07", "2021-01-08", "2021-01-09", "2021-01-10", "2021-01-11", "2021-01-12", "2021-01-13", ..... ]
+
+"weather_code": [51, 51, 51, 63, 3, 63, 63, 63, 63, 51, 53, 53, 3, 3, 2, 2, 3, 51, 2, 2, 3, 51, 3, 3, 2, 1, 0, 0, 0, 0, 0, 3, 3, 2, 53, 63, 51, 51, 3, 51, 51, 3, 53, 0, 0, 2, 0, 3, 3, 1, 63, 51, 51, 3, 51, 2, 2, 55, 55, 51, 53, 51, 0, 61, 51, 51, 53, 53, 1, 0, 3, 3, 3, 3, ...... ]
+
+Whereas files from Visual Crossing API have nested structure:
+
+{
+  "queryCost": 1530,
+  "latitude": 28.1562,
+  "longitude": -16.6359,
+  "resolvedAddress": "28.1562,-16.6359",
+  "address": "28.1562,-16.6359",
+  "timezone": "Atlantic/Canary",
+  "tzoffset": 0.0,
+  "days": [
+    {
+      "datetime": "2021-01-01",
+      "cloudcover": 60.8,
+      "visibility": 10.9,
+      "solarradiation": 76.3,
+      "solarenergy": 6.5,
+      "uvindex": 4.0,
+      "moonphase": 0.58,
+      "conditions": "Rain, Partially cloudy",
+      "description": "Partly cloudy throughout the day with late afternoon rain.",
+      "icon": "rain"
+    }, ...
 
