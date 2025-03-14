@@ -17,33 +17,40 @@ Project scope is collection of daily historical data of 4+ years from 2021-01-01
 **Stations distribution**
 
 Tenerife (largest and most diverse)
-    • 4 stations covering: 
-        ◦ Northern coast (Puerto de la Cruz) - humid, cloudier 
-        ◦ Southern coast (Costa Adeje) - sunny, drier 
-        ◦ Central highlands (Vilaflor) - cooler, mountain conditions 
-        ◦ Eastern area (Santa Cruz) - urban conditions 
+
+4 stations covering: 
+- Northern coast (Puerto de la Cruz) - humid, cloudier 
+- Southern coast (Costa Adeje) - sunny, drier 
+- Central highlands (Vilaflor) - cooler, mountain conditions 
+- Eastern area (Santa Cruz) - urban conditions
+
 Gran Canaria
-    • 3 stations covering: 
-        ◦ Las Palmas (northeast) - urban, coastal 
-        ◦ Maspalomas (south) - desert-like conditions 
-        ◦ Tejeda (central mountains) - altitude effects 
+3 stations covering: 
+- Las Palmas (northeast) - urban, coastal 
+- Maspalomas (south) - desert-like conditions 
+- Tejeda (central mountains) - altitude effects
+
 Lanzarote
-    • 2 stations covering: 
-        ◦ Arrecife (east coast) 
-        ◦ Mancha Blanca (Timanfaya area with volcanic microclimate) 
+2 stations covering: 
+- Arrecife (east coast) 
+- Mancha Blanca (Timanfaya area with volcanic microclimate)
+
 Fuerteventura
-    • 2 stations covering: 
-        ◦ Corralejo (northern area)
-        ◦ Costa Calma (southern peninsula)
+2 stations covering: 
+- Corralejo (northern area)
+- Costa Calma (southern peninsula)
+
 La Palma
-    • 1 station covering: 
-        ◦ Santa Cruz de La Palma
+1 station covering: 
+- Santa Cruz de La Palma
+
 La Gomera
-    • 1 station covering: 
-        ◦ San Sebastian de La Gomera
+1 station covering: 
+- San Sebastian de La Gomera
+
 El Hierro
-    • 1 station covering: 
-        ◦ Valverde
+1 station covering: 
+- Valverde
 
 There are multiple sources that provide API acces to historical weather data. However many of them have strict limitations for their free tiers and/or do not have an extensive set of metrics that one might need. After a thourough research, sources were narrowed down to two following ones:
 
