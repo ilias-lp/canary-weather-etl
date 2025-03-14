@@ -4,7 +4,7 @@ In this personal data engineering project, the aim is to set up a cloud based da
 
 **Project Outline:**
 
-Amazon Web Services (AWS) platform will be used as cloud platform for the whole Extract, Transform and Load (ETL) sequence.
+Amazon Web Services (AWS) platform will be used as cloud provider for the whole Extract, Transform and Load (ETL) sequence.
 
 ![Cloud ETL pipeline](https://github.com/user-attachments/assets/2b32e185-5ca7-45ef-8694-9f6d033fea8c)
 
