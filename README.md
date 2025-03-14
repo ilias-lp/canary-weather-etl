@@ -10,6 +10,9 @@
 - Data cataloging with Glue catalogue and ad-hoc querying with Athena
 - Setting up periodic update pipeline for current data that runs automatically through Eventbridge, Lambda, S3 and Glue services
 
+![Cloud ETL pipeline](https://github.com/user-attachments/assets/9e9c2df3-721c-4a9f-bed2-20ee7926b0b6)
+
+
 ## Data collection
 
 Project scope is collection of daily historical data of 4+ years from 2021-01-01 until current date (March 2025) for various weather stations across each of the seven Canary Islands.
