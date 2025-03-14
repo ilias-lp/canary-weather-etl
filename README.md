@@ -25,30 +25,36 @@ Tenerife (largest and most diverse)
 - Eastern area (Santa Cruz) - urban conditions
 
 Gran Canaria
+
 3 stations covering: 
 - Las Palmas (northeast) - urban, coastal 
 - Maspalomas (south) - desert-like conditions 
 - Tejeda (central mountains) - altitude effects
 
 Lanzarote
+
 2 stations covering: 
 - Arrecife (east coast) 
 - Mancha Blanca (Timanfaya area with volcanic microclimate)
 
 Fuerteventura
+
 2 stations covering: 
 - Corralejo (northern area)
 - Costa Calma (southern peninsula)
 
 La Palma
+
 1 station covering: 
 - Santa Cruz de La Palma
 
 La Gomera
+
 1 station covering: 
 - San Sebastian de La Gomera
 
 El Hierro
+
 1 station covering: 
 - Valverde
 
