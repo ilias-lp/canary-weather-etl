@@ -10,7 +10,8 @@
 - Data cataloging with Glue catalogue and ad-hoc querying with Athena
 - Setting up periodic update pipeline for current data that runs automatically through Eventbridge, Lambda, S3 and Glue services
 
-![Cloud ETL pipeline](https://github.com/user-attachments/assets/9e9c2df3-721c-4a9f-bed2-20ee7926b0b6)
+![Cloud ETL pipeline](https://github.com/user-attachments/assets/2b32e185-5ca7-45ef-8694-9f6d033fea8c)
+
 
 
 ## Data collection
