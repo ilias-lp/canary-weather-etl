@@ -14,9 +14,9 @@
 
 
 
-## Data collection
+## Data Extraction
 
-Project scope is collection of daily historical data of 4+ years from 2021-01-01 until current date (March 2025) for various weather stations across each of the seven Canary Islands.
+Project scope is to collect daily historical data of 4+ years from 2021-01-01 until current date (March 2025) for various weather stations across each of the seven Canary Islands.
 
 **Stations distribution**
 
@@ -542,7 +542,7 @@ Each location folder contains 2 JSON files corresponding to 2 data sources of or
 
 ![s3_2](https://github.com/user-attachments/assets/55c20375-c824-4e3c-894d-9a7ca2d1ab4f)
 
-## Data transformation
+## Data Transformation
 
 Before merging JSON files together it's important to point out that despite same file format, they have different internal structure.
 
@@ -763,7 +763,7 @@ for row in islands_locations_list:
 job.commit()
 ```
 
-## Data cataloging and querying
+## Glue Data Catalog Setup
 
 After the Glue job is completed, Parquet files are stored in a designated S3 bucket following specified partition structure.
 
@@ -774,3 +774,7 @@ In order to create a new catalogue table, a Glue crawler was created for the giv
 ![crawler](https://github.com/user-attachments/assets/4fe42593-43fd-4116-96dc-2737597a119e)
 
 ![schema](https://github.com/user-attachments/assets/e6d707dd-50dd-452e-a220-454217f84f20)
+
+## Ad-hoc Querying
+
+Amazon Athena provides access to S3 objects by running conventional SQL queries on them.
