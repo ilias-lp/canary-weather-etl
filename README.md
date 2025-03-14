@@ -587,6 +587,176 @@ Whereas files from Visual Crossing API have nested structure:
       "icon": "rain"
     },
 ```
+Therefore JSON files have to be processed differently depending on their internal structure before being merged.
 
+AWS Glue script below makes use of PySpark library for data handling and transformation. It iterates separately through 2 sets of JSON files depending on their name prefix, flattens the data out and combines into one columnar database in Parquet format. The output Parquet files are also stored in an S3 bucket which eliminates need for a relational database or a complex data warehouse system but still can be effectively queried and analyzed with SQL which makes it the most cost-efficient solution.
+
+
+```python
+import sys
+import json
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from awsglue.dynamicframe import DynamicFrame
+from pyspark.sql import functions as F
+from pyspark.sql.types import *
+from pyspark.sql.window import Window
+
+# Initialize Glue context
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+# Define S3 paths
+raw_bucket = "s3://canary-weather-raw/historical_data/"
+output_bucket = "s3://canary-weather-clean/historical_data/"
+
+# List all islands and locations
+islands_locations = spark.read.format("json").option("inferSchema", "true").option("multiLine", "true").load(raw_bucket + "*/*/*.json")
+islands_locations = islands_locations.select(F.regexp_extract(F.input_file_name(), "historical_data/(.*?)/(.*?)/", 1).alias("island"),
+                                           F.regexp_extract(F.input_file_name(), "historical_data/(.*?)/(.*?)/", 2).alias("location")).distinct()
+
+# Process each island and location
+islands_locations_list = islands_locations.collect()
+
+for row in islands_locations_list:
+    island = row["island"]
+    location = row["location"]
+    
+    print(f"Processing data for {island}/{location}")
+    
+    # Path to current location data
+    location_path = f"{raw_bucket}{island}/{location}/"
+    
+    # Read VC JSON file
+    vc_file_path = f"{location_path}vc*.json"
+    try:
+        vc_df = spark.read.format("json").option("inferSchema", "true").option("multiLine", "true").load(vc_file_path)
+        
+        # Extract nested data from days array
+        vc_df = vc_df.select(
+            F.lit(f"{island}/{location}").alias("location"),
+            F.col("latitude"),
+            F.col("longitude"),
+            F.col("timezone"),
+            F.explode("days").alias("day_data")
+        )
+        
+        # Flatten the day_data structure
+        vc_df = vc_df.select(
+            F.col("location"),
+            F.col("latitude"),
+            F.col("longitude"),
+            F.col("day_data.datetime").alias("date"),
+            F.col("day_data.cloudcover").alias("cloudcover"),
+            F.col("day_data.visibility").alias("visibility"),
+            F.col("day_data.solarradiation").alias("solarradiation"),
+            F.col("day_data.solarenergy").alias("solarenergy"),
+            F.col("day_data.uvindex").alias("uvindex"),
+            F.col("day_data.moonphase").alias("moonphase"),
+            F.col("day_data.conditions").alias("conditions"),
+            F.col("day_data.description").alias("description"),
+            F.col("day_data.icon").alias("icon")
+        )
+    except Exception as e:
+        print(f"Error processing VC file for {island}/{location}: {str(e)}")
+        vc_df = None
+    
+    # Read date-prefixed JSON file
+    date_file_path = f"{location_path}2*.json"
+    try:
+        date_df = spark.read.format("json").option("inferSchema", "true").option("multiLine", "true").load(date_file_path)
+        
+        # Get all the daily fields
+        daily_fields = date_df.select("daily.*").columns
+        
+        # Create a base dataframe with the common fields
+        base_df = date_df.select(
+            F.lit(f"{island}/{location}").alias("location"),
+            F.col("latitude"),
+            F.col("longitude"),
+            F.col("elevation"),
+            F.col("timezone")
+        )
+        
+        # Create a dataframe with exploded date column for joining
+        dates_df = base_df.crossJoin(
+            date_df.select(F.explode(F.col("daily.date")).alias("date"))
+        )
+        
+        # Get the array lengths to verify all arrays have the same length
+        array_lengths = {}
+        for field in daily_fields:
+            length_df = date_df.select(F.size(F.col(f"daily.{field}")).alias("length"))
+            array_lengths[field] = length_df.collect()[0]["length"]
+        
+        # Check if all arrays have the same length
+        array_length = next(iter(array_lengths.values()))
+        all_same_length = all(length == array_length for length in array_lengths.values())
+        
+        if not all_same_length:
+            raise ValueError("Arrays in daily fields have different lengths, cannot process reliably")
+        
+        # Create a proper dataset with one row per date, containing all data
+        daily_data_rows = []
+        
+        # Extract all array data
+        arrays_data = {}
+        for field in daily_fields:
+            field_data = date_df.select(F.col(f"daily.{field}")).collect()[0][0]
+            arrays_data[field] = field_data
+        
+        # Create a dataframe with all fields properly aligned
+        data_rows = []
+        for i in range(array_length):
+            row = {"date": arrays_data["date"][i]}
+            for field in daily_fields:
+                if field != "date":  # We already have date
+                    row[field] = arrays_data[field][i] if i < len(arrays_data[field]) else None
+            data_rows.append(row)
+        
+        # Create dataframe from the constructed rows
+        daily_df = spark.createDataFrame(data_rows)
+        
+        # Add the common fields
+        daily_df = daily_df.crossJoin(base_df.drop("date").limit(1))
+        
+    except Exception as e:
+        print(f"Error processing date file for {island}/{location}: {str(e)}")
+        daily_df = None
+    
+    # Combine the two datasets if both exist
+    if vc_df is not None and daily_df is not None:
+        # Join on location and date
+        combined_df = vc_df.join(daily_df, ["location", "date", "latitude", "longitude"], "inner")
+        
+        # Extract year and month from date for partitioning
+        combined_df = combined_df.withColumn("year", F.year(F.to_date(F.col("date"), "yyyy-MM-dd")))
+        combined_df = combined_df.withColumn("month", F.month(F.to_date(F.col("date"), "yyyy-MM-dd")))
+        
+        # Create island and location columns for partitioning
+        combined_df = combined_df.withColumn("island", F.lit(island))
+        combined_df = combined_df.withColumn("location_name", F.lit(location))
+        
+        # Write to Parquet, partitioned by island, location, year, and month
+        output_path = f"{output_bucket}"
+        
+        combined_df.write.mode("append") \
+            .partitionBy("island", "location_name", "year", "month") \
+            .parquet(output_path)
+        
+        print(f"Successfully processed and saved data for {island}/{location}")
+    else:
+        print(f"Skipping {island}/{location} as one or both source files are missing or invalid")
+
+# Job completed
+job.commit()
+```
 
 
