@@ -60,7 +60,7 @@ El Hierro
 
 There are multiple sources that provide API acces to historical weather data. However many of them have strict limitations for their free tiers and/or do not have an extensive set of metrics that one might need. After a thourough research, sources were narrowed down to two following ones:
 
-- **Open-meteo Historical Weather API** https://open-meteo.com/en/docs/historical-weather-api
+**Open-meteo Historical Weather API** https://open-meteo.com/en/docs/historical-weather-api
 
 With free 10 000 API calls per day and a broad list of daily weather variables, this source is chosen to be the main one. Below is the full list of daily weather variables available for collection.
 
@@ -106,7 +106,7 @@ Reference Evapotranspiration (ET₀)
 
 It can be seen that it comprises all essential variables but still misses some of other metrics of potential interest such as UV index or percentage of cloudcover. This brings us to the second data source for additional variables.
 
-- **Visual Crossing Weather API** https://www.visualcrossing.com/weather-api/
+**Visual Crossing Weather API** https://www.visualcrossing.com/weather-api/
 This one has much less generous free tier but is compensated by a reasonably cheap metered subscription type charging 0.0001 USD per API call.
 Additional variables collected from here are:
 
@@ -530,4 +530,11 @@ def lambda_handler(event, context):
 
 ```
 
+This concludes the historical raw data collection that is now stored in S3 and organized by its location.
+
+![s3_1](https://github.com/user-attachments/assets/abc6b59d-6ced-430a-8e73-ce7bec1a2b32)
+
+Each location folder contains 2 JSON files corresponding to 2 data sources of origin. In order to differentiate, files from Visual Crossing have 'vc' prefix in their names.
+
+![s3_2](https://github.com/user-attachments/assets/55c20375-c824-4e3c-894d-9a7ca2d1ab4f)
 
