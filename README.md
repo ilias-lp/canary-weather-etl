@@ -61,27 +61,47 @@ El Hierro
 There are multiple sources that provide API acces to historical weather data. However many of them have strict limitations for their free tiers and/or do not have an extensive set of metrics that one might need. After a thourough research, sources were narrowed down to two following ones:
 
 - **Open-meteo Historical Weather API** https://open-meteo.com/en/docs/historical-weather-api
+
 With free 10 000 API calls per day and a broad list of daily weather variables, this source is chosen to be the main one. Below is the full list of daily weather variables available for collection.
 
 Weather code
+
 Maximum Temperature (2 m)
+
 Minimum Temperature (2 m)
+
 Mean Temperature (2 m)
+
 Maximum Apparent Temperature (2 m)
+
 Minimum Apparent Temperature (2 m)
+
 Mean Apparent Temperature (2 m)
+
 Sunrise
+
 Sunset
+
 Daylight Duration
+
 Sunshine Duration
+
 Precipitation Sum
+
 Rain Sum
+
 Snowfall Sum
+
 Precipitation Hours
+
 Maximum Wind Speed (10 m)
+
 Maximum Wind Gusts (10 m)
+
 Dominant Wind Direction (10 m)
+
 Shortwave Radiation Sum
+
 Reference Evapotranspiration (ET₀)
 
 It can be seen that it comprises all essential variables but still misses some of other metrics of potential interest such as UV index or percentage of cloudcover. This brings us to the second data source for additional variables.
@@ -91,14 +111,23 @@ This one has much less generous free tier but is compensated by a reasonably che
 Additional variables collected from here are:
 
 datetime (for reference)
+
 cloudcover
+
 visibility
+
 solarradiation
+
 solarenergy
+
 uvindex
+
 moonphase
+
 conditions
+
 description
+
 icon
 
 The next step is programmatic implementation of API calls from 2 given sources by making use of Lambda function as IDE platform and S3 bucket as the output storage destination.
