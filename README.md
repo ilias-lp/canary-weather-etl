@@ -551,24 +551,46 @@ Files from Open-meteo API have array structure that goes as follows:
 Whereas files from Visual Crossing API have nested structure:
 
 {
+
   "queryCost": 1530,
+  
   "latitude": 28.1562,
+  
   "longitude": -16.6359,
+  
   "resolvedAddress": "28.1562,-16.6359",
+  
   "address": "28.1562,-16.6359",
+  
   "timezone": "Atlantic/Canary",
+  
   "tzoffset": 0.0,
+  
   "days": [
+  
     {
+    
       "datetime": "2021-01-01",
+      
       "cloudcover": 60.8,
+      
       "visibility": 10.9,
+      
       "solarradiation": 76.3,
+      
       "solarenergy": 6.5,
+      
       "uvindex": 4.0,
+      
       "moonphase": 0.58,
+      
       "conditions": "Rain, Partially cloudy",
+      
       "description": "Partly cloudy throughout the day with late afternoon rain.",
+      
       "icon": "rain"
+      
     }, ...
+
+
 
