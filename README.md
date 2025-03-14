@@ -1,14 +1,10 @@
-# Cloud based ETL design for historical weather database
+# Cloud based setup for historical weather database
 
-
+In this personal data engineering project, the aim is to set up a cloud based database comprising an extensive set of historical weather parameters for several recent years across multiple locations in Canary Islands. The use case of such database is finding out best spots and periods for various sorts of activities (hiking, surfing, beach, etc.) that depend on weather conditions. Next to setting up a bulk of historical data, monthly periodic updates are a part of the scope for keeping the database content relevant and up-to-date.
 
 **Project Outline:**
 
-- Data scope and sources overview
-- Extraction of historical raw data in JSON format via API calls with Lambda function from multiple sources
-- Merging and transformation of raw data with AWS Glue into one dataset in Parquet format stored in S3 bucket
-- Data cataloging with Glue catalogue and ad-hoc querying with Athena
-- Setting up periodic update pipeline for current data that runs automatically through Eventbridge, Lambda, S3 and Glue services
+Amazon Web Services (AWS) platform will be used as cloud platform for the whole Extract, Transform and Load (ETL) sequence.
 
 ![Cloud ETL pipeline](https://github.com/user-attachments/assets/2b32e185-5ca7-45ef-8694-9f6d033fea8c)
 
