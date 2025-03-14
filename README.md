@@ -589,7 +589,7 @@ Whereas files from Visual Crossing API have nested structure:
 ```
 Therefore JSON files have to be processed differently depending on their internal structure before being merged.
 
-AWS Glue script below makes use of PySpark library for data handling and transformation. It iterates separately through 2 sets of JSON files depending on their name prefix, flattens the data out and combines into one columnar database in Parquet format. The output Parquet files are also stored in an S3 bucket which eliminates need for a relational database or a complex data warehouse system but still can be effectively queried and analyzed with SQL which makes it the most cost-efficient solution.
+AWS Glue script below makes use of PySpark library for data handling and transformation. It iterates separately through 2 sets of JSON files depending on their name prefix, flattens the data out and combines it into one columnar database in Parquet format. The output Parquet files are also stored in an S3 bucket which eliminates need for a relational database or a complex data warehouse system but still can be effectively queried and analyzed with SQL which makes it the most cost-efficient solution. Since Athena billing costs are calculated based on the volume of scanned data, the dataset is partitioned by **island**, **location_name**, **year** and **month** in order to reduce the amount of scanned data for queries that specify any of these key parameters.
 
 
 ```python
@@ -759,4 +759,13 @@ for row in islands_locations_list:
 job.commit()
 ```
 
+## Data cataloging and querying
+
+After the Glue job is completed, Parquet files are stored in a designated S3 bucket following specified partition structure.
+
+![s3_3](https://github.com/user-attachments/assets/dd96850e-cfe8-4865-a7ca-184e0670bbf5)
+
+In order to create a catalogue table, a Glue crawler was created for a given S3 location that has automatically detected schema and partitions.
+
+![crawler](https://github.com/user-attachments/assets/4fe42593-43fd-4116-96dc-2737597a119e)
 
