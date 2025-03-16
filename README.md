@@ -773,4 +773,41 @@ In order to create a new catalogue table, a Glue crawler was created for the giv
 
 ## Ad-hoc Querying
 
-Amazon Athena provides access to S3 objects by running conventional SQL queries on them.
+Amazon Athena provides access to S3 objects by running conventional SQL queries on them. There are numerous ways to group and analyze obtained data that contains dozens of parameters. For example the query for finding out the sunniest location would be as follows:
+
+```sql
+SELECT location, ROUND((AVG(sunshine_duration)/3600), 2) AS avg_sunshine_hours
+FROM "AwsDataCatalog"."canary-weather"."canary_weather_clean"
+GROUP BY location
+ORDER BY avg_sunshine_hours DESC;
+```
+where daily sunshine duration (given in seconds) gets converted to hours and its global average is calculated for each location.
+
+![athena_1](https://github.com/user-attachments/assets/4b01b746-a494-40de-ad11-1913550a35a5)
+
+The results rank all 14 locations from highest to lowest daily average sunshine duration. However it's a very general metric that doesn't illustrate changes by time of year. In order to find the sunniest months and their corresponding locations, the following query can be run:
+
+```sql
+SELECT location, month, ROUND((AVG(sunshine_duration)/3600), 2) AS avg_sunshine_hours
+FROM "AwsDataCatalog"."canary-weather"."canary_weather_clean"
+GROUP BY location, month
+ORDER BY avg_sunshine_hours DESC
+LIMIT 10;
+```
+![athena_2](https://github.com/user-attachments/assets/266634db-c405-4d0b-b174-c1c54d75db31)
+
+This provides more insightful view such that June and July are the months wiht longest sunshine duration across the islands.
+
+Another practical example is checking for average UV index number in a specific location for each month. Besides that, using a partitioned column in WHERE condition narrows down the amount of scanned data by factor 14 in our case, since data is evenly distributed among 14 locations.
+
+```sql
+SELECT month, ROUND((AVG(uvindex), 1) AS avg_uvindex
+FROM "AwsDataCatalog"."canary-weather"."canary_weather_clean"
+WHERE location_name = 'Las_Palmas_de_Gran_Canaria'
+GROUP BY month
+ORDER BY avg_uvindex DESC;
+```
+![athena_3](https://github.com/user-attachments/assets/9a37619c-4c67-4fdd-b844-7da0c7626c9e)
+
+## Periodic Update
+
