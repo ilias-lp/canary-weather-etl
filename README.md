@@ -811,11 +811,11 @@ ORDER BY avg_uvindex DESC;
 
 ## Periodic Update
 
-In order to keep the database relevant, periodic updates are necessary. In order to minimize costs that are majorly chrager per job run on AWS, a monthly update will be considered for implementation. It will comprise scheduled running of two lambda functions (for each data source), Glue job triggered by successful completion of Lambda functions and triggering of Glue crawler for data catalog update at the end of the Glue job.
+Periodic updates are necessary for maintaining the database's relevance. In order to minimize costs that are majorly charged per job run on AWS, a monthly update will be considered for implementation. It will comprise scheduled running of two lambda functions (for each data source), Glue job triggered by successful completion of Lambda functions and triggering of Glue crawler for data catalog update by completion of the Glue job.
 
 ![Automated Database Update](https://github.com/user-attachments/assets/b93e17ca-cc14-4c69-b18e-ccd89051d3b4)
 
-Collecting data for the past month only requires some changes in our Lambda code as for extraction period and S3 bucket key where a specifically designated location for updates will be used. Taken intoi account non-critical nature of monthly raw data, the update folder content will be scheduled for deletion a few days after creation through S3 Lifecycle Rules for having a clean /updates path for the next monthly update.
+Collecting data for the past month only requires some changes in our Lambda code as for extraction period and S3 bucket key where a specifically designated location for updates will be used. Taken into account non-critical nature of monthly raw data, the update folder content will be scheduled for deletion a few days after creation through S3 Lifecycle Rules for having a clean /updates path for the next monthly update.
 
 ```python
 import json
@@ -1215,4 +1215,344 @@ def lambda_handler(event, context):
     }
 
 ```
+
+The completion of both Lambda functions triggers th Glue transformation script via another EventBridge rule that attaches new rows to existing dataset. 
+
+```python
+import sys
+import json
+from datetime import datetime
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+from pyspark.sql import functions as F
+from pyspark.sql.types import *
+
+# Initialize Glue context
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+# Define S3 paths - directly use a fixed source path
+raw_bucket = "s3://canary-weather-raw/updates/"
+output_bucket = "s3://canary-weather-clean/historical_data/"
+
+print(f"Using raw data path: {raw_bucket}")
+
+# Check if output table exists and get its schema
+def ensure_output_table_exists():
+    try:
+        # Try to read a small sample to see if data exists and get schema
+        output_df = spark.read.parquet(output_bucket).limit(1)
+        output_df.count()
+        print("Output table exists")
+        
+        # Check data types of columns
+        columns_info = [(field.name, field.dataType) for field in output_df.schema.fields]
+        print("Existing schema:", columns_info)
+        
+        # Get column names to check for duplicates
+        existing_columns = [field.name for field in output_df.schema.fields]
+        if len(existing_columns) != len(set(existing_columns)):
+            print("WARNING: Existing table has duplicate column names!")
+            
+        return True, output_df.schema
+    except Exception as e:
+        print(f"Output table does not exist: {str(e)}")
+        print("Creating a minimal table structure for inserts")
+        
+        # Create a minimal dataframe with just a few key columns
+        minimal_schema = StructType([
+            StructField("location", StringType(), False),
+            StructField("date", DateType(), False),  # Use DateType to ensure consistent type
+            StructField("year", IntegerType(), False),
+            StructField("month", IntegerType(), False),
+            StructField("island", StringType(), False),
+            StructField("location_name", StringType(), False)
+        ])
+        
+        empty_df = spark.createDataFrame([], minimal_schema)
+        empty_df.write.partitionBy("island", "location_name", "year", "month").parquet(output_bucket)
+        print("Created initial table structure")
+        return True, minimal_schema
+
+# Register the output location as a temporary table for overwrites
+table_exists, existing_schema = ensure_output_table_exists()
+spark.read.parquet(output_bucket).createOrReplaceTempView("weather_data")
+
+# List all islands and locations in the raw bucket
+try:
+    islands_locations = spark.read.format("json").option("inferSchema", "true").option("multiLine", "true").load(raw_bucket + "*/*/*.json")
+    # Extract island and location from file path
+    islands_locations = islands_locations.withColumn("file_path", F.input_file_name())
+    
+    # Extract island and location components from the file path
+    islands_locations = islands_locations.withColumn(
+        "island", 
+        F.expr("regexp_extract(file_path, '/([^/]+)/[^/]+/[^/]+\\.json$', 1)")
+    ).withColumn(
+        "location", 
+        F.expr("regexp_extract(file_path, '/[^/]+/([^/]+)/[^/]+\\.json$', 1)")
+    )
+    
+    islands_locations = islands_locations.select("island", "location").distinct()
+    
+    # Filter out any empty values
+    islands_locations = islands_locations.filter(
+        (F.col("island").isNotNull()) & 
+        (F.length(F.col("island")) > 0) &
+        (F.col("location").isNotNull()) & 
+        (F.length(F.col("location")) > 0)
+    )
+except Exception as e:
+    print(f"Error identifying islands/locations: {str(e)}")
+    islands_locations = spark.createDataFrame([], StructType([StructField("island", StringType(), False), StructField("location", StringType(), False)]))
+
+# Process each island and location
+islands_locations_list = islands_locations.collect()
+print(f"Found {len(islands_locations_list)} island/location combinations to process")
+
+for row in islands_locations_list:
+    island = row["island"]
+    location = row["location"]
+    
+    print(f"Processing data for {island}/{location}")
+    
+    # Path to current location data
+    location_path = f"{raw_bucket}{island}/{location}/"
+    
+    # Read VC JSON file
+    vc_file_path = f"{location_path}vc*.json"
+    try:
+        vc_df = spark.read.format("json").option("inferSchema", "true").option("multiLine", "true").load(vc_file_path)
+        
+        # Extract nested data from days array
+        vc_df = vc_df.select(
+            F.lit(f"{island}/{location}").alias("location"),
+            F.col("latitude"),
+            F.col("longitude"),
+            F.col("timezone"),
+            F.explode("days").alias("day_data")
+        )
+        
+        # Flatten the day_data structure
+        vc_df = vc_df.select(
+            F.col("location"),
+            F.col("latitude"),
+            F.col("longitude"),
+            F.col("day_data.datetime").alias("date"),
+            F.col("day_data.cloudcover").alias("cloudcover"),
+            F.col("day_data.visibility").alias("visibility"),
+            F.col("day_data.solarradiation").alias("solarradiation"),
+            F.col("day_data.solarenergy").alias("solarenergy"),
+            F.col("day_data.uvindex").alias("uvindex"),
+            F.col("day_data.moonphase").alias("moonphase"),
+            F.col("day_data.conditions").alias("conditions"),
+            F.col("day_data.description").alias("description"),
+            F.col("day_data.icon").alias("icon")
+        )
+        
+        # Convert date string to DateType to maintain consistency
+        vc_df = vc_df.withColumn("date", F.to_date(F.col("date"), "yyyy-MM-dd"))
+        
+    except Exception as e:
+        print(f"Error processing VC file for {island}/{location}: {str(e)}")
+        vc_df = None
+    
+    # Read date-prefixed JSON file
+    date_file_path = f"{location_path}2*.json"
+    try:
+        date_df = spark.read.format("json").option("inferSchema", "true").option("multiLine", "true").load(date_file_path)
+        
+        # Get all the daily fields
+        daily_fields = date_df.select("daily.*").columns
+        
+        # Create a base dataframe with the common fields
+        base_df = date_df.select(
+            F.lit(f"{island}/{location}").alias("location"),
+            F.col("latitude"),
+            F.col("longitude"),
+            F.col("elevation"),
+            F.col("timezone")
+        )
+        
+        # Get the array lengths to verify all arrays have the same length
+        array_lengths = {}
+        for field in daily_fields:
+            length_df = date_df.select(F.size(F.col(f"daily.{field}")).alias("length"))
+            array_lengths[field] = length_df.collect()[0]["length"]
+        
+        # Check if all arrays have the same length
+        array_length = next(iter(array_lengths.values()))
+        all_same_length = all(length == array_length for length in array_lengths.values())
+        
+        if not all_same_length:
+            raise ValueError("Arrays in daily fields have different lengths, cannot process reliably")
+        
+        # Extract all array data
+        arrays_data = {}
+        for field in daily_fields:
+            field_data = date_df.select(F.col(f"daily.{field}")).collect()[0][0]
+            arrays_data[field] = field_data
+        
+        # Create a dataframe with all fields properly aligned
+        data_rows = []
+        for i in range(array_length):
+            row = {"date": arrays_data["date"][i]}
+            for field in daily_fields:
+                if field != "date":  # We already have date
+                    row[field] = arrays_data[field][i] if i < len(arrays_data[field]) else None
+            data_rows.append(row)
+        
+        # Create dataframe from the constructed rows
+        daily_df = spark.createDataFrame(data_rows)
+        
+        # Add the common fields
+        daily_df = daily_df.crossJoin(base_df.drop("date").limit(1))
+        
+        # Convert date string to DateType to maintain consistency
+        daily_df = daily_df.withColumn("date", F.to_date(F.col("date"), "yyyy-MM-dd"))
+        
+    except Exception as e:
+        print(f"Error processing date file for {island}/{location}: {str(e)}")
+        daily_df = None
+    
+    # Combine the two datasets if both exist
+    if vc_df is not None and daily_df is not None:
+        try:
+            # Avoid duplicate columns during join
+            # Get a list of columns in both dataframes
+            vc_columns = set(vc_df.columns)
+            daily_columns = set(daily_df.columns)
+            
+            # Identify common columns (beyond the join keys)
+            common_columns = vc_columns.intersection(daily_columns) - {"location", "date", "latitude", "longitude"}
+            
+            if common_columns:
+                print(f"Found overlapping columns: {common_columns}")
+                # Rename duplicate columns in daily_df
+                for col in common_columns:
+                    daily_df = daily_df.withColumnRenamed(col, f"{col}_daily")
+            
+            # Join on location and date
+            combined_df = vc_df.join(daily_df, ["location", "date", "latitude", "longitude"], "inner")
+            
+            # Extract year and month from date for partitioning
+            combined_df = combined_df.withColumn("year", F.year(F.col("date")))
+            combined_df = combined_df.withColumn("month", F.month(F.col("date")))
+            
+            # Create island and location columns for partitioning
+            combined_df = combined_df.withColumn("island", F.lit(island))
+            combined_df = combined_df.withColumn("location_name", F.lit(location))
+            
+            # Check for and fix any duplicate column names
+            column_names = combined_df.columns
+            if len(column_names) != len(set(column_names)):
+                print("WARNING: Found duplicate column names in the combined dataframe!")
+                # Find duplicates
+                from collections import Counter
+                duplicates = [item for item, count in Counter(column_names).items() if count > 1]
+                print(f"Duplicate columns: {duplicates}")
+
+                # Create a new dataframe with unique column names
+                unique_columns = []
+                column_counter = {}
+                
+                for col in column_names:
+                    if col in column_counter:
+                        column_counter[col] += 1
+                        unique_columns.append(f"{col}_{column_counter[col]}")
+                    else:
+                        column_counter[col] = 0
+                        unique_columns.append(col)
+                
+                # Select with renamed columns
+                select_expr = [F.col(original).alias(new) for original, new in zip(column_names, unique_columns)]
+                combined_df = combined_df.select(*select_expr)
+            
+            # Get a list of distinct dates
+            update_dates = combined_df.select("date").distinct().collect()
+            dates_list = [row["date"] for row in update_dates]
+            
+            print(f"Data contains {len(dates_list)} unique dates")
+            
+            # Register this as a temp table
+            combined_df.createOrReplaceTempView("new_data")
+            
+            # Find all affected partitions
+            affected_partitions = combined_df.select("island", "location_name", "year", "month").distinct().collect()
+            
+            print(f"This data will affect {len(affected_partitions)} partitions")
+            
+            # Process each partition separately for overwrite
+            for partition in affected_partitions:
+                p_island = partition["island"]
+                p_location = partition["location_name"]
+                p_year = partition["year"]
+                p_month = partition["month"]
+                
+                partition_filter = f"""
+                    island = '{p_island}' AND 
+                    location_name = '{p_location}' AND 
+                    year = {p_year} AND 
+                    month = {p_month}
+                """
+                
+                # Get new data for this partition
+                new_partition_data = spark.sql(f"SELECT * FROM new_data WHERE {partition_filter}")
+                
+                # Define partition path
+                partition_path = f"{output_bucket}island={p_island}/location_name={p_location}/year={p_year}/month={p_month}/"
+                
+                try:
+                    # Check if this partition exists
+                    spark.read.parquet(partition_path).limit(1).count()
+                    
+                    # Get existing data, but filter out dates that are in our update
+                    existing_partition_data = spark.sql(f"""
+                        SELECT * FROM weather_data 
+                        WHERE {partition_filter}
+                        AND NOT EXISTS (
+                            SELECT 1 FROM new_data
+                            WHERE new_data.date = weather_data.date
+                            AND new_data.location = weather_data.location
+                            AND {partition_filter}
+                        )
+                    """)
+                    
+                    # Combine existing (non-overlapping) data with new data
+                    final_partition_data = existing_partition_data.union(new_partition_data)
+                    
+                    # Write with overwrite mode for this specific partition
+                    final_partition_data.write \
+                        .mode("overwrite") \
+                        .parquet(partition_path)
+                    
+                    print(f"Updated existing partition: {p_island}/{p_location}/{p_year}/{p_month}")
+                    
+                except Exception as e:
+                    print(f"Partition doesn't exist yet or error: {str(e)}")
+                    print(f"Writing new partition: {p_island}/{p_location}/{p_year}/{p_month}")
+                    
+                    # Write directly as this partition doesn't exist yet
+                    new_partition_data.write \
+                        .mode("overwrite") \
+                        .parquet(partition_path)
+            
+            print(f"Successfully processed and saved data for {island}/{location}")
+        except Exception as e:
+            print(f"Error combining and writing data for {island}/{location}: {str(e)}")
+    else:
+        print(f"Skipping {island}/{location} as one or both source files are missing or invalid")
+
+print("Data processing completed successfully")
+job.commit()
+```
+
+Finally, another EventBridge rule starts Glue crawler that updates the existing data catalog after a successful Glue job completion which concludes the monthly update process.
 
