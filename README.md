@@ -1,6 +1,6 @@
 # Cloud based setup for historical weather database
 
-In this personal data engineering project, the aim is to set up a cloud based database comprising an extensive set of historical weather parameters for several recent years across multiple locations in Canary Islands. The use case of such database is finding out best spots and periods for various sorts of activities (hiking, surfing, beach, etc.) that depend on weather conditions. Next to setting up a bulk of historical data, monthly periodic updates are a part of the scope for keeping the database content relevant and up-to-date.
+In this personal data engineering project, the aim is to set up a cloud based database comprising an extensive set of historical weather metrics for several recent years across multiple locations in Canary Islands. The use case of such database is finding out best spots and periods for different sorts of activities (hiking, surfing, beach, etc.) that depend on weather conditions. Next to setting up a bulk of historical data, monthly periodic updates are a part of the scope for keeping the database content up-to-date.
 
 **Project Outline**
 
@@ -12,7 +12,7 @@ Amazon Web Services (AWS) platform will be used as cloud provider for the whole 
 
 ## Data Extraction
 
-Project scope is to collect daily historical data of 4+ years from 2021-01-01 until current date (March 2025) for various weather stations across each of the seven Canary Islands.
+Data collection scope is daily historical records of 4+ years from 2021-01-01 until present (March 2025) for various weather stations across each of the seven Canary Islands.
 
 **Stations distribution**
 
@@ -58,7 +58,7 @@ El Hierro
 1 station covering: 
 - Valverde
 
-There are multiple sources that provide API acces to historical weather data. However many of them have strict limitations for their free tiers and/or do not have an extensive set of metrics that one might need. After a thourough research, sources were narrowed down to two following ones:
+There are multiple sources that provide API acces to historical weather data. However many of them have strict limitations for their free tiers and/or do not have a large set of metrics that one might need. After the sources research, they were narrowed down to two following APIs:
 
 **Open-meteo Historical Weather API** https://open-meteo.com/en/docs/historical-weather-api
 
@@ -104,7 +104,7 @@ Shortwave Radiation Sum
 
 Reference Evapotranspiration (ET₀)
 
-It can be seen that it comprises all essential variables but still misses some of other metrics of potential interest such as UV index or percentage of cloudcover. This brings us to the second data source for additional variables.
+It can be seen that it comprises all essential variables but still misses some other metrics of potential interest such as UV index or percentage of cloudcover. This brings us to the second data source for additional variables.
 
 **Visual Crossing Weather API** https://www.visualcrossing.com/weather-api/
 This one has much less generous free tier but is compensated by a reasonably cheap metered subscription type charging 0.0001 USD per API call.
@@ -132,7 +132,7 @@ icon
 
 The next step is programmatic implementation of API calls from 2 given sources by making use of Lambda function as IDE platform and S3 bucket as the output storage destination.
 
-Below is Lambda function code for Open-meteo API that doesn't require an API key and runs smoothly as long as the number of calls stays below 10 000 which implies execution of the code below in 3 steps by commenting out 2/3 of locations for each call, as 365 days * 4+ years * 14 stations = 20 440+ calls required in total.
+Below is Lambda function code for Open-meteo API that doesn't require API key and runs smoothly as long as the number of calls stays below 10 000 which implies execution of the code below in 3 steps by commenting out 2/3 of locations for each call, as 365 days * 4+ years * 14 stations = 20 440+ calls required in total.
 
 ```python
 import json
@@ -246,7 +246,7 @@ def lambda_handler(event, context):
 
 ```
 
-In a similar way, Lambda function code for Visual Crossing API is collecting required data. But this time an account based API key for billing is necessary. In order to avoid exposing of such sensitive credentials in the code, AWS Secrets Manager service is being used where API key is securely stored under a specified public name and being accessed through the get_secret function.
+In a similar way, Lambda function code for Visual Crossing API is collecting required data. This time the account based API key for billing is necessary. In order to avoid exposing of such sensitive credentials in the code, AWS Secrets Manager service is being used where API key is securely stored under a specified public name and being accessed through the get_secret function.
 
 
 ```python
@@ -339,7 +339,7 @@ def get_secret():
                         logger.info(f"Found API key under field: {key}")
                         return api_key
                 
-                # If none of the expected keys are found but there's only one value, use that
+                # If none of the expected keys are found but there's only one value
                 if len(secret_json) == 1:
                     api_key = next(iter(secret_json.values()))
                     logger.info("Using the only value in the JSON")
@@ -348,7 +348,7 @@ def get_secret():
                 # Log all keys (without values) for debugging
                 logger.error(f"Could not find expected key in JSON. Available keys: {list(secret_json.keys())}")
                 
-                # Last resort: return the entire JSON string
+                # Return the entire JSON string
                 logger.info("Returning the entire JSON string as a fallback")
                 return secret_string
             else:
@@ -530,7 +530,7 @@ def lambda_handler(event, context):
 
 ```
 
-This concludes the historical raw data collection that is now stored in S3 and organized by its location.
+This concludes the historical raw data collection that is now stored in S3 and sorted in folders with location names.
 
 ![s3_1](https://github.com/user-attachments/assets/abc6b59d-6ced-430a-8e73-ce7bec1a2b32)
 
@@ -589,7 +589,7 @@ Whereas files from Visual Crossing API have nested structure:
 ```
 Therefore JSON files have to be processed differently depending on their internal structure before being merged.
 
-AWS Glue script below makes use of PySpark library for data handling and transformation. It iterates separately through 2 sets of JSON files depending on their name prefix, flattens the data out and combines it into one columnar database in Parquet format. The output Parquet files are also stored in an S3 bucket which eliminates need for a relational database or a complex data warehouse system but still can be effectively queried and analyzed with SQL which makes it the most cost-efficient solution. Since Athena billing costs are calculated based on the volume of scanned data, the dataset is partitioned by **island**, **location_name**, **year** and **month** in order to reduce the amount of scanned data for queries that specify any of these key parameters.
+AWS Glue script below makes use of PySpark library for data handling and transformation. It iterates separately through 2 sets of JSON files depending on their name prefix, flattens the data out and combines it into one columnar database in Parquet format. The output Parquet files are also stored in an S3 bucket which eliminates need for a relational database or a complex data warehouse system but still can be effectively queried and analyzed with SQL which makes it effective and cheap solution. Since Athena billing costs are calculated based on the volume of scanned data, the dataset is partitioned by **island**, **location_name**, **year** and **month** in order to reduce the amount of scanned data for queries that specify any of those key parameters.
 
 
 ```python
@@ -811,11 +811,11 @@ ORDER BY avg_uvindex DESC;
 
 ## Periodic Update
 
-Periodic updates are necessary for maintaining the database's relevance. In order to minimize costs that are majorly charged per job run on AWS, a monthly update will be considered for implementation. It will comprise scheduled running of two lambda functions (for each data source), Glue job triggered by successful completion of Lambda functions and triggering of Glue crawler for data catalog update by completion of the Glue job.
+Periodic updates are necessary for maintaining the database's relevance. In order to minimize costs that are majorly charged per job run on AWS, a monthly update will be considered for implementation. It will comprise scheduled running of two Lambda functions (for each data source), Glue job triggered by successful completion of Lambda functions and triggering of Glue crawler for data catalog update by completion of the Glue job.
 
 ![Automated Database Update](https://github.com/user-attachments/assets/b93e17ca-cc14-4c69-b18e-ccd89051d3b4)
 
-Collecting data for the past month only requires some changes in our Lambda code as for extraction period and S3 bucket key where a specifically designated location for updates will be used. Taken into account non-critical nature of monthly raw data, the update folder content will be scheduled for deletion a few days after creation through S3 Lifecycle Rules for having a clean /updates path for the next monthly update.
+Collecting data for the past month only requires some changes in Lambda code as for extraction period and altering S3 bucket key where a specifically designated location for updates will be used. Taken into account non-critical nature of monthly raw data, the update folder content will be scheduled for deletion a few days after creation, through S3 Lifecycle Rules for having a clean /updates path for the next monthly update.
 
 ```python
 import json
@@ -1031,7 +1031,7 @@ def get_secret():
                 # Log all keys (without values) for debugging
                 logger.error(f"Could not find expected key in JSON. Available keys: {list(secret_json.keys())}")
                 
-                # Last resort: return the entire JSON string
+                # Return the entire JSON string
                 logger.info("Returning the entire JSON string as a fallback")
                 return secret_string
             else:
@@ -1216,7 +1216,7 @@ def lambda_handler(event, context):
 
 ```
 
-The completion of both Lambda functions triggers th Glue transformation script via another EventBridge rule that attaches new rows to existing dataset. 
+The completion of both Lambda functions triggers the Glue transformation script via another EventBridge rule that appends new rows to existing dataset. 
 
 ```python
 import sys
@@ -1453,7 +1453,7 @@ for row in islands_locations_list:
             # Check for and fix any duplicate column names
             column_names = combined_df.columns
             if len(column_names) != len(set(column_names)):
-                print("WARNING: Found duplicate column names in the combined dataframe!")
+                print("WARNING: Found duplicate column names in the combined dataframe")
                 # Find duplicates
                 from collections import Counter
                 duplicates = [item for item, count in Counter(column_names).items() if count > 1]
